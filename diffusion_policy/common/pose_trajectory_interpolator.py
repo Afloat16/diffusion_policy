@@ -93,6 +93,11 @@ class PoseTrajectoryInterpolator:
         assert duration >= 0
         last_waypoint_time = curr_time + duration
 
+        # A zero-duration command replaces the pose at the retained endpoint;
+        # appending the same timestamp would violate Slerp's strict ordering.
+        if duration == 0:
+            return PoseTrajectoryInterpolator(np.array([curr_time]), np.asarray(pose)[None, :])
+
         # insert new pose
         trimmed_interp = self.trim(curr_time, curr_time)
         times = np.append(trimmed_interp.times, [last_waypoint_time], axis=0)
@@ -175,6 +180,12 @@ class PoseTrajectoryInterpolator:
         duration = max(duration, max(pos_min_duration, rot_min_duration))
         assert duration >= 0
         last_waypoint_time = end_time + duration
+
+        # A zero-duration insertion replaces the existing endpoint.
+        if duration == 0:
+            poses = trimmed_interp.poses.copy()
+            poses[-1] = pose
+            return PoseTrajectoryInterpolator(trimmed_interp.times, poses)
 
         # insert new pose
         times = np.append(trimmed_interp.times, [last_waypoint_time], axis=0)
