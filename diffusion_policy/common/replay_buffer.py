@@ -539,6 +539,7 @@ class ReplayBuffer:
         return result
     
     def get_episode_slice(self, idx):
+        idx = list(range(len(self.episode_ends)))[idx]
         start_idx = 0
         if idx > 0:
             start_idx = self.episode_ends[idx-1]
