@@ -446,17 +446,27 @@ class ReplayBuffer:
             data: Dict[str, np.ndarray], 
             chunks: Optional[Dict[str,tuple]]=dict(),
             compressors: Union[str, numcodecs.abc.Codec, dict]=dict()):
-        assert(len(data) > 0)
-        is_zarr = (self.backend == 'zarr')
+        if not data:
+            raise ValueError("An episode must contain at least one data field")
+        missing_keys = set(self.data.keys()) - set(data.keys())
+        if missing_keys:
+            raise ValueError(f"Episode is missing existing fields: {sorted(missing_keys)}")
 
-        curr_len = self.n_steps
+        # Validate every field before resizing any stored array. A late shape
+        # error must not leave data arrays longer than the episode metadata.
         episode_length = None
         for key, value in data.items():
-            assert(len(value.shape) >= 1)
+            if len(value.shape) < 1 or len(value) == 0:
+                raise ValueError(f"Episode field {key!r} must have a nonempty time dimension")
             if episode_length is None:
                 episode_length = len(value)
-            else:
-                assert(episode_length == len(value))
+            elif episode_length != len(value):
+                raise ValueError("Episode fields must have the same time dimension")
+            if key in self.data and value.shape[1:] != self.data[key].shape[1:]:
+                raise ValueError(f"Episode field {key!r} has incompatible feature dimensions")
+
+        is_zarr = (self.backend == 'zarr')
+        curr_len = self.n_steps
         new_len = curr_len + episode_length
 
         for key, value in data.items():
@@ -588,3 +598,4 @@ class ReplayBuffer:
                 compressor = self.resolve_compressor(value)
                 if compressor != arr.compressor:
                     rechunk_recompress_array(self.data, key, compressor=compressor)
+
