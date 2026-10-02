@@ -457,6 +457,16 @@ class ReplayBuffer:
                 episode_length = len(value)
             else:
                 assert(episode_length == len(value))
+        if episode_length == 0:
+            raise ValueError("Cannot add an empty episode")
+        missing_keys = set(self.data.keys()) - set(data.keys())
+        if missing_keys:
+            raise ValueError(f"Episode is missing existing data keys: {sorted(missing_keys)}")
+        # Validate every existing field before resizing any arrays. New fields
+        # remain supported and are zero-filled over the earlier episodes.
+        for key, value in data.items():
+            if key in self.data and value.shape[1:] != self.data[key].shape[1:]:
+                raise ValueError(f"Episode shape for {key} does not match existing data")
         new_len = curr_len + episode_length
 
         for key, value in data.items():
